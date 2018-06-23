@@ -1,0 +1,5 @@
+module Evaluator
+= struct
+
+
+end
