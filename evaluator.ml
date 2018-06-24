@@ -1,9 +1,10 @@
 module Evaluator
 = struct
 
-module P = Printf
+include Ast
+open Ast
 
-type ast = Atom of string | Var of string | App of string * ast list
+module P = Printf
 
 let rec print_ast ast = match ast with
   (App(s, hd::tl)) -> 
