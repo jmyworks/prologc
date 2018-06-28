@@ -28,7 +28,9 @@ module Parser
     raise (Syntax_error ("line " ^ (Printf.sprintf "%d" line) ^ ": expected of '"  
             ^ (L.token_string excepted) ^ "' but met '" 
             ^ (L.token_string !tok) ^ "'..."))
-  
+
+  let trace msg = () (*ignore(Lexer.print_token !tok;print_string (Printf.sprintf ":%s\n" msg)) *) 
+
   let check t = match !tok with
     L.CID _ -> if (t = (L.CID "")) then () else error(__LINE__, t)
     | L.VID _ -> if (t = (L.VID "")) then () else error(__LINE__, t)
@@ -37,11 +39,16 @@ module Parser
   
   let eat t = (check t; advance())
   
-  let rec clauses() = match !tok with
+  let rec clauses() = trace "clauses";match !tok with
     L.EOF -> []
-    | _ -> (clause()::clauses())
+    | _ -> 
+      begin
+        let _clause = clause() in
+        let _clauses = clauses() in
+        _clause::_clauses
+      end
   
-  and clause() = 
+  and clause() = trace "clause"; 
     begin
       let _terms = terms() in
       let _to = to_opt() in 
@@ -49,7 +56,7 @@ module Parser
       _terms@_to
     end
   
-  and to_opt() = match !tok with
+  and to_opt() = trace "to";match !tok with
     L.TO -> (eat L.TO; terms())
     | _ -> []
       
@@ -77,7 +84,7 @@ module Parser
         ignore(E.eval(!prog, _term))
       end
   
-  and term() = match !tok with
+  and term() = trace "term";match !tok with
     L.ONE '(' -> 
       begin
         eat(L.ONE '('); 
@@ -87,13 +94,24 @@ module Parser
       end
     | _ -> predicate()
   
-  and terms() = (term()::terms'())
+  and terms() = trace "terms";
+    begin
+      let _term = term() in
+      let _terms' = terms'() in
+      _term::_terms'
+    end
   
-  and terms'() = match !tok with
-    L.ONE ',' -> (eat(L.ONE ','); term()::terms'())
+  and terms'() = trace "terms'";match !tok with
+    L.ONE ',' -> 
+      begin
+        eat(L.ONE ','); 
+        let _term = term() in
+        let _terms' = terms'() in
+        _term::_terms'
+      end
     | _ -> []
   
-  and predicate() = 
+  and predicate() = trace "predicate";
     begin
       let _fn = funname() in
       eat(L.ONE '('); 
@@ -102,17 +120,29 @@ module Parser
       A.App(_fn, _args)
     end
   
-  and args() = (expr()::args'())
+  and args() = trace "args";
+    begin
+      let _expr = expr() in 
+      let _args' = args'() in
+      _expr::_args'
+    end
   
-  and args'() = match !tok with
-    L.ONE ',' -> (eat(L.ONE ','); expr()::args'())
+  and args'() = trace "args'";match !tok with
+    L.ONE ',' -> 
+      begin
+        eat(L.ONE ','); 
+        let _expr = expr() in
+        let _args' = args'() in
+        _expr::_args'
+      end
     | _ -> []
 
-  and expr() = match !tok with
+  and expr() = trace "expr";match !tok with
     L.ONE '(' -> 
       begin
+        trace "try expr_non_term";
         try expr_non_term() with
-          Syntax_error _ -> 
+          Syntax_error _ -> trace "try expr_non_term failed";
             begin
               revToken (L.ONE '(');
               term()
@@ -123,12 +153,13 @@ module Parser
     | L.NUM _ -> id()
     | L.CID s -> 
       begin
+        trace "try term";
         try term() with
-          Syntax_error _ -> (revToken (L.CID s); id())
+          Syntax_error _ -> trace "try term failed";(revToken (L.CID s); id())
       end
     | _ -> term()
 
-  and expr_non_term() = match !tok with
+  and expr_non_term() = trace "expr_non_term";match !tok with
     L.ONE '(' -> 
       begin
         eat(L.ONE '('); 
@@ -153,13 +184,13 @@ module Parser
     | L.ONE ',' -> (eat(L.ONE ','); list()) 
     | _ -> A.Atom "nil"
   
-  and id() = match !tok with
+  and id() = trace "id";match !tok with
     L.CID cid -> (eat(L.CID ""); A.Atom cid)
     | L.VID vid -> (eat(L.VID ""); A.Var vid)
     | L.NUM num -> (eat(L.NUM ""); A.Atom num)
     | _ -> error(__LINE__, L.CID "");
  
-  and funname() = match !tok with
+  and funname() = trace "funname";match !tok with
     L.CID cid -> (eat(L.CID ""); cid)
     | _ -> error(__LINE__, L.CID "")
   
