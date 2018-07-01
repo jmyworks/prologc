@@ -6,7 +6,7 @@ let rec run() =
   while true do
     flush stdout; 
     Lexer._ISTREAM := stdin;
-    Parser.advance(); 
+    Parser.advance();
     Parser.command(); 
     print_string "\n?- "
   done;;

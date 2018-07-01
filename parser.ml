@@ -29,7 +29,10 @@ module Parser
             ^ (L.token_string excepted) ^ "' but met '" 
             ^ (L.token_string !tok) ^ "'..."))
 
-  let trace msg = () (*ignore(Lexer.print_token !tok;print_string (Printf.sprintf ":%s\n" msg)) *) 
+  
+  (*let trace msg = ignore(Lexer.print_token !tok;print_string (Printf.sprintf ":%s\n" msg))*)
+  
+  let trace msg = ()
 
   let check t = match !tok with
     L.CID _ -> if (t = (L.CID "")) then () else error(__LINE__, t)
@@ -79,9 +82,9 @@ module Parser
       end
     | _ -> 
       begin
-        let _term = term() in
-        check(L.ONE '.');
-        ignore(E.eval(!prog, _term))
+        let _terms = terms() in
+        ignore(E.eval(!prog, _terms))
+        (*A.print_ast_list _terms*)
       end
   
   and term() = trace "term";match !tok with
