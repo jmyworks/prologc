@@ -29,11 +29,12 @@ module Parser
             ^ (L.token_string excepted) ^ "' but met '" 
             ^ (L.token_string !tok) ^ "'..."))
 
+ 
+  let debug = false
+  let trace msg = 
+    if debug then ignore(Lexer.print_token !tok;print_string (Printf.sprintf ":%s\n" msg))
+    else () 
   
-  (*let trace msg = ignore(Lexer.print_token !tok;print_string (Printf.sprintf ":%s\n" msg))*)
-  
-  let trace msg = ()
-
   let check t = match !tok with
     L.CID _ -> if (t = (L.CID "")) then () else error(__LINE__, t)
     | L.VID _ -> if (t = (L.VID "")) then () else error(__LINE__, t)
@@ -95,6 +96,12 @@ module Parser
         eat(L.ONE ')');
         _term
       end
+    | L.VID _ -> 
+      begin
+        eat(L.VID "");
+        eat(L.IS);
+        arithmexp()
+      end
     | _ -> predicate()
   
   and terms() = trace "terms";
@@ -148,17 +155,27 @@ module Parser
           Syntax_error _ -> trace "try expr_non_term failed";
             begin
               revToken (L.ONE '(');
-              term()
+              try term() with
+                Syntax_error _ -> trace "try term failed";
+                  begin
+                    revToken (L.ONE '(');
+                    arithmexp()
+                  end
             end
       end
     | L.ONE '[' -> expr_non_term()
-    | L.VID _ -> id()
-    | L.NUM _ -> id()
+    | L.VID _ -> arithmexp()
+    | L.NUM _ -> arithmexp()
+    | L.ONE '-' -> arithmexp()
     | L.CID s -> 
       begin
         trace "try term";
         try term() with
-          Syntax_error _ -> trace "try term failed";(revToken (L.CID s); id())
+          Syntax_error _ -> trace "try term failed";
+            begin
+              revToken (L.CID s); 
+              arithmexp()
+            end
       end
     | _ -> term()
 
@@ -177,7 +194,52 @@ module Parser
         eat(L.ONE ']');
         _list
       end
-  
+ 
+  and arithmexp() = trace "arithmexp";arithmexp' (arithmterm())
+
+  and arithmexp' arithmterm_left = trace "arithmexp'";match !tok with
+    L.ONE '+' ->
+      begin
+        eat(L.ONE '+');
+        arithmexp' (A.App("+", [arithmterm_left; arithmterm()]))
+      end
+    | L.ONE '-' ->
+      begin
+        eat(L.ONE '-');
+        arithmexp' (A.App("-", [arithmterm_left; arithmterm()]))
+      end
+    | _ -> arithmterm_left
+
+  and arithmterm() = trace "arithmterm";arithmterm' (arithmfactor())
+
+  and arithmterm' arithmfactor_left = trace "arithmterm'";match !tok with
+    L.ONE '*' ->
+      begin
+        eat(L.ONE '*');
+        arithmterm' (A.App("*", [arithmfactor_left; arithmfactor()]))
+      end
+    | L.ONE '/' ->
+       begin
+        eat(L.ONE '/');
+        arithmterm' (A.App("/", [arithmfactor_left; arithmfactor()]))
+      end
+    | _ -> arithmfactor_left
+
+  and arithmfactor() = trace "arithmfactor";match !tok with
+    L.ONE '(' ->
+      begin
+        eat(L.ONE '(');
+        let _arithmexp = arithmexp() in
+        eat(L.ONE ')');
+        _arithmexp
+      end
+    | L.ONE '-' ->
+      begin
+        eat(L.ONE '-');
+        A.App("-", [A.Atom "0"; arithmexp()])
+      end
+    | _ -> id()
+
   and list() = match !tok with
     L.ONE ']' -> A.Atom "nil"
     | _ -> A.App("cons", [expr(); list_opt()])
