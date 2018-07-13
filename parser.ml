@@ -83,8 +83,8 @@ module Parser
       end
     | _ -> 
       begin
-        let _terms = terms() in
-        ignore(E.eval(!prog, _terms))
+        let _term = term() in
+        ignore(E.eval(!prog, _term))
         (*A.print_ast_list _terms*)
       end
   
@@ -150,20 +150,20 @@ module Parser
   and expr() = trace "expr";match !tok with
     L.ONE '(' -> 
       begin
-        trace "try expr_non_term";
-        try expr_non_term() with
-          Syntax_error _ -> trace "try expr_non_term failed";
+        try term() with
+          Syntax_error _ -> trace "try term failed";
             begin
               revToken (L.ONE '(');
-              try term() with
-                Syntax_error _ -> trace "try term failed";
-                  begin
-                    revToken (L.ONE '(');
-                    arithmexp()
-                  end
+              arithmexp()
             end
       end
-    | L.ONE '[' -> expr_non_term()
+    | L.ONE '[' ->
+      begin
+        eat(L.ONE '[');
+        let _list = list() in
+        eat(L.ONE ']');
+        _list
+      end
     | L.VID _ -> arithmexp()
     | L.NUM _ -> arithmexp()
     | L.ONE '-' -> arithmexp()
@@ -179,22 +179,6 @@ module Parser
       end
     | _ -> term()
 
-  and expr_non_term() = trace "expr_non_term";match !tok with
-    L.ONE '(' -> 
-      begin
-        eat(L.ONE '('); 
-        let _non_term = expr_non_term() in 
-        eat(L.ONE ')');
-        _non_term
-      end
-    | _ -> 
-      begin
-        eat(L.ONE '['); 
-        let _list = list() in 
-        eat(L.ONE ']');
-        _list
-      end
- 
   and arithmexp() = trace "arithmexp";arithmexp' (arithmterm())
 
   and arithmexp' arithmterm_left = trace "arithmexp'";match !tok with

@@ -34,21 +34,28 @@ let mgu (a, b) =
     | (_, _) -> (false, unifier)
   in ut ([a], [b], (fun x -> x))
 
-let succeed query = (print_ast_list query; true)
+let succeed query = (print_ast query; true)
 
-let rec solve (program, question, result) = match question with
+let rename ver term =
+  let rec mapVar ast = match ast with
+    (Atom x) -> Atom(x)
+    | (Var n) -> Var(n ^ "#" ^ ver)
+    | (App(n, terms)) -> App(n, List.map mapVar terms)
+  in mapVar term
+
+let rec solve (program, question, result, depth) = match question with
   [] -> succeed result
   | goal::goals ->
-    let onestep _ clause = match clause with
+    let onestep _ clause = match List.map (rename (string_of_int depth)) clause with
       [] -> raise Compiler_error
       | head::conds ->
         let (unifiable, unifier) = mgu(head, goal) in
           if unifiable then
-            solve (program, List.map unifier (conds@goals), List.map unifier result)
+            solve (program, List.map unifier (conds@goals), unifier result, depth+1)
           else
             true
         in List.fold_left onestep true program
 
-let eval (program, question) = solve(program, question, question)
+let eval (program, question) = solve(program, [question], question, 1)
 
 end
