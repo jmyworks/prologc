@@ -226,7 +226,12 @@ module Parser
 
   and list() = match !tok with
     L.ONE ']' -> A.Atom "nil"
-    | _ -> A.App("cons", [expr(); list_opt()])
+    | _ -> 
+      begin
+        let _expr = expr() in
+        let _list_opt = list_opt() in
+        A.App("cons", _expr::[_list_opt])
+      end
   
   and list_opt() = match !tok with
     L.ONE '|' -> (eat(L.ONE '|'); id())

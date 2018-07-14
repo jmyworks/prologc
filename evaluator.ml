@@ -34,7 +34,7 @@ let mgu (a, b) =
     | (_, _) -> (false, unifier)
   in ut ([a], [b], (fun x -> x))
 
-let succeed query = (print_ast query; true)
+let succeed query = (print_string ((ast2string query) ^ ".\n"); true)
 
 let rename ver term =
   let rec mapVar ast = match ast with
