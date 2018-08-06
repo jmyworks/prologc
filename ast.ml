@@ -21,7 +21,9 @@ let rec source2string source = match source with
   | Other str -> str
 
 and ast2source ast = match ast with 
-  App("cons", (_ as elem)::(Atom "nil")::_) -> 
+  App("is", (Var var)::arithmexpr::_) ->
+    Other(P.sprintf "%s is %s" var (ast2string arithmexpr))
+  | App("cons", (_ as elem)::(Atom "nil")::_) -> 
     List([elem])
   | App("cons", (_ as head)::(App("cons", rest))::_) ->
     begin

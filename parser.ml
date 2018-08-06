@@ -10,6 +10,7 @@ module Parser
   module E = Evaluator
  
   exception Syntax_error of string
+  exception Eval_stop
   
   let prog = ref [[A.Var ""]]
   let revTok = ref ([]: L.token list)
@@ -83,9 +84,25 @@ module Parser
       end
     | _ -> 
       begin
-        let _term = term() in
-        ignore(E.eval(!prog, _term))
-        (*A.print_ast_list _terms*)
+        let rec read_next () = 
+          begin 
+            advance(); 
+            match !tok  with 
+              Lexer.ONE ';' -> ()
+              | Lexer.ONE '.'  -> raise Eval_stop 
+              | _ -> read_next (); 
+          end in 
+        let results = E.eval(!prog, terms()) in
+        try (List.iter (fun result ->
+          print_string (List.fold_left
+            (fun sentence (name, value) ->
+              Printf.sprintf "%s%s = %s\n"
+                sentence
+                name
+                value)
+            ""  
+            result); flush stdout; read_next()) results) with
+            Eval_stop -> ()
       end
   
   and term() = trace "term";match !tok with
@@ -96,11 +113,11 @@ module Parser
         eat(L.ONE ')');
         _term
       end
-    | L.VID _ -> 
+    | L.VID vid -> 
       begin
         eat(L.VID "");
         eat(L.IS);
-        arithmexp()
+        A.App("is", [A.Var vid; arithmexp()])
       end
     | _ -> predicate()
   

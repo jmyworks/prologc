@@ -35,7 +35,8 @@ let mgu (a, b) =
   in ut ([a], [b], (fun x -> x))
 
 let rec get_vars ast_list = match ast_list with
-  (App(_, (_ as arg1)::(_ as arg2)::_))::rest -> (get_vars [arg1])@(get_vars [arg2])@(get_vars rest)
+  (App(_, (_ as arg1)::(_ as arg2)::_))::rest -> 
+    (get_vars [arg1])@(get_vars [arg2])@(get_vars rest)
   | (Var var)::rest -> (Var var)::(get_vars rest)
   | _ -> []
 
@@ -47,6 +48,10 @@ let rec map_vars (vars, unifier) =
       []
       vars
   end 
+
+let rec print_mapping list = match list with
+  (key, value)::rest -> print_string (P.sprintf "\n(%s, %s)" (ast2string key) (ast2string value)); print_mapping rest
+  | [] -> (print_string "\nempty\n")
 
 let succeed vars_mapping = 
   begin
@@ -67,16 +72,7 @@ let succeed vars_mapping =
         else (key, filter_var key mapping)::(filter_vars rest)
       | (_, _)::rest -> (assert false)
       | [] -> []
-    in 
-    print_string (List.fold_left 
-      (fun sentence (name, value) -> 
-        P.sprintf "%s%s = %s\n" 
-          sentence 
-          name 
-          value)
-      ""
-      (filter_vars vars_mapping));
-    true
+    in (filter_vars vars_mapping)
   end
 
 let rename ver term =
@@ -86,21 +82,47 @@ let rename ver term =
     | (App(n, terms)) -> App(n, List.map mapVar terms)
   in mapVar term
 
-let rec solve (program, question, depth, vars_mapping) = match question with
-  [] -> succeed vars_mapping
-  | goal::goals ->
-    let onestep _ clause = match List.map (rename (string_of_int depth)) clause with
-      [] -> raise Compiler_error
-      | head::conds ->
-        let (unifiable, unifier) = mgu(head, goal) in
-          if unifiable then
-            let unified_question = (List.map unifier (conds@goals)) in
-            solve (program, unified_question, depth+1, vars_mapping@(map_vars ((get_vars question), unifier)))
-          else
-            true
-    in List.fold_left onestep true program
+let rec calc expr = match expr with
+  App("+", left::right::_) ->
+    (calc left) + (calc right)
+  | App("-", left::right::_) ->
+    (calc left) - (calc right)
+  | App("*", left::right::_) ->
+    (calc left) * (calc right)
+  | App("/", left::right::_) ->
+    (calc left) / (calc right)
+  | Atom atom ->
+    int_of_string atom
+  | _ -> raise Compiler_error
 
-let eval (program, question) = solve(program, [question], 1, [])
+let rec solve (program, question, depth, vars_mapping) = match question with
+  [] -> [succeed vars_mapping]
+  | goal::goals -> match goal with
+    App("is", (Var var)::arithmexpr::_) -> 
+      [succeed [(Var var, Atom (string_of_int (calc arithmexpr)))]]
+    | _ ->
+      let onestep results clause = match List.map (rename (string_of_int depth)) clause with
+        [] -> raise Compiler_error
+        | head::conds ->
+          let (unifiable, unifier) = mgu(head, goal) in
+            if unifiable then
+              (solve (program, List.map unifier (conds@goals), depth+1, 
+                vars_mapping@(map_vars ((get_vars question), unifier))))@results
+            else
+              results
+      in List.fold_left onestep [[]] program
+
+let eval (program, question) = 
+  begin
+    let results = List.filter 
+      (fun result -> List.length result > 0) 
+      (solve(program, question, 1, [])) in
+    let rec remove_dups list = match list with
+      [] -> []
+      | (key, value)::rest -> 
+        (key, value)::(remove_dups (List.filter (fun (k, v) -> k <> key) rest))
+    in (List.map remove_dups results)
+  end
 
 
 end
